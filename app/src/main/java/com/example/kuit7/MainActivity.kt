@@ -44,9 +44,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainApp() {
-    var currentTab by remember { mutableIntStateOf(0) }
-    var selectedArticle by remember { mutableStateOf<NewsArticle?>(null) }
-    var selectedCall by remember { mutableStateOf<Call?>(null) }
+    val navController = rememberNavController()
 
     val articles = listOf(
         NewsArticle(R.drawable.image1, "Europe", "Ukraine's President Zelensky to BBC: Blood money being paid...", "BBC News", R.drawable.bbc_icon, "14m ago"),
@@ -62,50 +60,103 @@ fun MainApp() {
         Call(R.drawable.phone3, "홍길동", "010-1234-5678")
     )
 
-    when {
-        selectedArticle != null -> {
-            NewsDetailScreen(
-                article = selectedArticle!!,
-                onBack = { selectedArticle = null }
-            )
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
+
+    val showBottomBar = currentDestination?.hasRoute<NewsHome>() == true
+            || currentDestination?.hasRoute<ContactHome>() == true
+
+    Scaffold(
+        bottomBar = {
+            if (showBottomBar) {
+                NavigationBar {
+                    NavigationBarItem(
+                        selected = currentDestination?.hasRoute<NewsHome>() == true,
+                        onClick = {
+                            navController.navigate(NewsHome) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Text("🏠", fontSize = 20.sp) },
+                        label = { Text("홈") }
+                    )
+                    NavigationBarItem(
+                        selected = currentDestination?.hasRoute<ContactHome>() == true,
+                        onClick = {
+                            navController.navigate(ContactHome) {
+                                popUpTo(navController.graph.findStartDestination().id) {
+                                    saveState = true
+                                }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Text("📞", fontSize = 20.sp) },
+                        label = { Text("연락처") }
+                    )
+                }
+            }
         }
-        selectedCall != null -> {
-            ContactDetailScreen(
-                call = selectedCall!!,
-                onBack = { selectedCall = null }
-            )
-        }
-        else -> {
-            Scaffold(
-                bottomBar = {
-                    NavigationBar {
-                        NavigationBarItem(
-                            selected = currentTab == 0,
-                            onClick = { currentTab = 0 },
-                            icon = { Text("🏠", fontSize = 20.sp) },
-                            label = { Text("홈") }
-                        )
-                        NavigationBarItem(
-                            selected = currentTab == 1,
-                            onClick = { currentTab = 1 },
-                            icon = { Text("📞", fontSize = 20.sp) },
-                            label = { Text("연락처") }
+    ) { padding ->
+        NavHost(
+            navController = navController,
+            startDestination = NewsHome,
+            modifier = Modifier.padding(padding)
+        ) {
+            composable<NewsHome> {
+                NewsScreen(
+                    articles = articles,
+                    onArticleClick = { article ->
+                        navController.navigate(
+                            NewsDetailRoute(
+                                image = article.image,
+                                category = article.category,
+                                title = article.title,
+                                source = article.source,
+                                sourceIcon = article.sourceIcon,
+                                time = article.time
+                            )
                         )
                     }
-                }
-            ) { padding ->
-                when (currentTab) {
-                    0 -> NewsScreen(
-                        articles = articles,
-                        onArticleClick = { selectedArticle = it },
-                        modifier = Modifier.padding(padding)
-                    )
-                    1 -> ContactScreen(
-                        callList = callList,
-                        onContactClick = { selectedCall = it },
-                        modifier = Modifier.padding(padding)
-                    )
-                }
+                )
+            }
+
+            composable<ContactHome> {
+                ContactScreen(
+                    callList = callList,
+                    onContactClick = { call ->
+                        navController.navigate(
+                            ContactDetailRoute(
+                                image = call.image,
+                                name = call.name,
+                                phone = call.phone
+                            )
+                        )
+                    }
+                )
+            }
+
+            composable<NewsDetailRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<NewsDetailRoute>()
+                NewsDetailScreen(
+                    article = NewsArticle(
+                        route.image, route.category, route.title,
+                        route.source, route.sourceIcon, route.time
+                    ),
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable<ContactDetailRoute> { backStackEntry ->
+                val route = backStackEntry.toRoute<ContactDetailRoute>()
+                ContactDetailScreen(
+                    call = Call(route.image, route.name, route.phone),
+                    onBack = { navController.popBackStack() }
+                )
             }
         }
     }
